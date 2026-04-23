@@ -1,13 +1,18 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { MMDLoader } from '@moeru/three-mmd'
+import { MMDLoader, VMDLoader, buildAnimation } from '@moeru/three-mmd'
+import { useForceIgnoreMouse } from '@/hooks/utils/use-force-ignore-mouse'
 
 interface MMDModelProps {
     pmxUrl: string
+    vmdUrl?: string
+    isPet?: boolean
+    petOffsetY?: number
 }
 
-export function MMDModel({ pmxUrl }: MMDModelProps) {
+export function MMDModel({ pmxUrl, vmdUrl, isPet, petOffsetY = 0 }: MMDModelProps) {
     const mountRef = useRef<HTMLDivElement>(null)
+    const { forceIgnoreMouse } = useForceIgnoreMouse()
 
     useEffect(() => {
         const mount = mountRef.current
@@ -24,11 +29,61 @@ export function MMDModel({ pmxUrl }: MMDModelProps) {
         renderer.domElement.style.pointerEvents = 'none'
         mount.appendChild(renderer.domElement)
 
+        // Drag state
+        const meshRef = { current: null as THREE.SkinnedMesh | null }
+        let isDragging = false
+        let dragStartX = 0
+        let dragStartY = 0
+        let meshStartX = 0
+        let meshStartZ = 0
+
+        const onMouseDown = (e: MouseEvent) => {
+            isDragging = true
+            dragStartX = e.clientX
+            dragStartY = e.clientY
+            if (meshRef.current) {
+                meshStartX = meshRef.current.position.x
+                meshStartZ = meshRef.current.position.z
+            }
+        }
+
+        const onMouseMove = (e: MouseEvent) => {
+            if (!isDragging || !meshRef.current) return
+            const dx = (e.clientX - dragStartX) * 0.05
+            const dy = (e.clientY - dragStartY) * 0.05
+            meshRef.current.position.x = meshStartX + dx
+            meshRef.current.position.z = meshStartZ + dy
+        }
+        const electronApi = (window as any).electron
+        const onMouseUp = () => { isDragging = false }
+
+        const onMouseEnter = () => {
+            electronApi?.ipcRenderer.send('update-component-hover', 'mmd-model', true)
+        }
+
+        const onMouseLeave = () => {
+            electronApi?.ipcRenderer.send('update-component-hover', 'mmd-model', false)
+        }
+
+
+        if (isPet) {
+            mount.addEventListener('mousedown', onMouseDown)
+            mount.addEventListener('mousemove', onMouseMove)
+            mount.addEventListener('mouseup', onMouseUp)
+            mount.addEventListener('mouseenter', onMouseEnter)
+            mount.addEventListener('mouseleave', onMouseLeave)
+        }
+
         const scene = new THREE.Scene()
 
+        const aspect = width / height
+        const zDistance = isPet ? 150 : 40
+        const cameraY = isPet ? 10.27 + (petOffsetY * 0.01) : 10.27
+        // const adjustedZ = zDistance / aspect * 1.5
+
         const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000)
-        camera.position.set(0, 10.27, 40)
-        camera.lookAt(0, 10.27, 0)
+        camera.position.set(0, cameraY, zDistance)
+        camera.lookAt(0, cameraY, 0)
 
         scene.add(new THREE.AmbientLight(0xffffff, 1.5))
         const dirLight = new THREE.DirectionalLight(0xffffff, 1)
@@ -42,6 +97,9 @@ export function MMDModel({ pmxUrl }: MMDModelProps) {
         )
         scene.add(testMesh)
 
+        const mixerRef = { current: null as THREE.AnimationMixer | null }
+        const clockRef = { current: new THREE.Clock() }
+
         const loader = new MMDLoader()
         loader.load(
             pmxUrl,
@@ -51,13 +109,24 @@ export function MMDModel({ pmxUrl }: MMDModelProps) {
                 mmd.mesh.scale.setScalar(1)
                 mmd.mesh.position.set(0, 0, 0)
                 scene.add(mmd.mesh)
+                meshRef.current = mmd.mesh
 
-                // Log bounding box para saber dónde está el modelo
-                const box = new THREE.Box3().setFromObject(mmd.mesh)
-                const size = box.getSize(new THREE.Vector3())
-                const center = box.getCenter(new THREE.Vector3())
-                console.log('[MMDModel] Bounding box size:', size)
-                console.log('[MMDModel] Bounding box center:', center)
+                // Cargar animación VMD si existe
+                if (vmdUrl) {
+                    const vmdLoader = new VMDLoader()
+                    vmdLoader.load(
+                        vmdUrl,
+                        (vmd) => {
+                            const animation = buildAnimation(vmd, mmd.mesh)
+                            animation.name = 'motion'
+                            const mixer = new THREE.AnimationMixer(mmd.mesh)
+                            mixer.clipAction(animation).play()
+                            mixerRef.current = mixer
+                        },
+                        undefined,
+                        (error) => console.error('[MMDModel] VMD error:', error),
+                    )
+                }
             },
             (progress) => {
                 console.log('[MMDModel] Loading:', Math.round(100 * progress.loaded / progress.total) + '%')
@@ -77,6 +146,10 @@ export function MMDModel({ pmxUrl }: MMDModelProps) {
         let animId: number
         const animate = () => {
             animId = requestAnimationFrame(animate)
+            const delta = clockRef.current.getDelta()
+            if (mixerRef.current) {
+                mixerRef.current.update(delta)
+            }
             testMesh.rotation.y += 0.01
             renderer.render(scene, camera)
         }
@@ -85,10 +158,17 @@ export function MMDModel({ pmxUrl }: MMDModelProps) {
         return () => {
             cancelAnimationFrame(animId)
             window.removeEventListener('resize', handleResize)
+            if (isPet) {
+                mount.removeEventListener('mousedown', onMouseDown)
+                mount.removeEventListener('mousemove', onMouseMove)
+                mount.removeEventListener('mouseup', onMouseUp)
+                mount.removeEventListener('mouseenter', onMouseEnter)
+                mount.removeEventListener('mouseleave', onMouseLeave)
+            }
             mount.removeChild(renderer.domElement)
             renderer.dispose()
         }
-    }, [pmxUrl])
+    }, [pmxUrl, isPet])
 
     return (
         <div

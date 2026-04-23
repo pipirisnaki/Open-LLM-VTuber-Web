@@ -86,7 +86,8 @@ function AppContent(): JSX.Element {
     left: 0,
     width: "100vw",
     height: "100vh",
-    zIndex: 15,
+    zIndex: 6,
+    pointerEvents: "none" as const,
   };
 
   return (
@@ -97,8 +98,17 @@ function AppContent(): JSX.Element {
           ? getResponsiveLive2DWindowStyle(showSidebar)
           : live2dPetStyle)}
       >
-        {/* Cambiado: <Live2D /> -> <MMDModel /> */}
-        <MMDModel pmxUrl="/models/suisei/suisei.pmx" />
+        {/* Live2D oculto pero activo para mantener la lógica de mouse en pet mode */}
+        <Box style={{ opacity: 0, position: 'absolute', width: '100%', height: '100%' }}>
+          <Live2D showSidebar={showSidebar} />
+        </Box>
+        {/* MMD encima */}
+        <MMDModel
+          pmxUrl="/models/suisei/suisei.pmx"
+          vmdUrl="/models/suisei/standing.vmd"
+          isPet={mode === 'pet'}
+          petOffsetY={1440}
+        />
       </Box>
 
       {/* Conditional Rendering of Window UI */}
