@@ -29,6 +29,7 @@ import Background from "./components/canvas/background";
 import WebSocketStatus from "./components/canvas/ws-status";
 import Subtitle from "./components/canvas/subtitle";
 import { ModeProvider, useMode } from "./context/mode-context";
+import { MMDModel } from "./components/canvas/mmd-model";
 
 function AppContent(): JSX.Element {
   const [showSidebar, setShowSidebar] = useState(true);
@@ -47,7 +48,7 @@ function AppContent(): JSX.Element {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-    
+
   document.documentElement.style.overflow = 'hidden';
   document.body.style.overflow = 'hidden';
   document.documentElement.style.height = '100%';
@@ -57,58 +58,53 @@ function AppContent(): JSX.Element {
   document.documentElement.style.width = '100%';
   document.body.style.width = '100%';
 
-  // Define base style properties shared across modes/breakpoints
   const live2dBaseStyle = {
     position: "absolute" as const,
     overflow: "hidden",
-    transition: "all 0.3s ease-in-out", // Optional transition
-    pointerEvents: "auto" as const,
+    transition: "all 0.3s ease-in-out",
+    pointerEvents: "none" as const,
   };
 
-  // Define styles specifically for the "window" mode, using responsive syntax
   const getResponsiveLive2DWindowStyle = (sidebarVisible: boolean) => ({
     ...live2dBaseStyle,
     top: isElectron ? "30px" : "0px",
     height: `calc(100% - ${isElectron ? "30px" : "0px"})`,
-    zIndex: 5, // Ensure it's layered correctly below UI but above background
+    zIndex: 6,
     left: {
-      base: "0px", // Column layout (base): Start from left edge
-      md: sidebarVisible ? "440px" : "24px", // Row layout (md+): Offset by sidebar width
+      base: "0px",
+      md: sidebarVisible ? "440px" : "24px",
     },
     width: {
-      base: "100%", // Column layout (base): Full width
-      md: `calc(100% - ${sidebarVisible ? "440px" : "24px"})`, // Row layout (md+): Adjust width based on sidebar
+      base: "100%",
+      md: `calc(100% - ${sidebarVisible ? "440px" : "24px"})`,
     },
   });
 
-  // Define styles specifically for the "pet" mode
   const live2dPetStyle = {
     ...live2dBaseStyle,
-    top: 0, // Override position for pet mode
+    top: 0,
     left: 0,
-    width: "100vw", // Full viewport
+    width: "100vw",
     height: "100vh",
-    zIndex: 15, // Higher zIndex for pet mode overlay
+    zIndex: 15,
   };
 
   return (
     <>
       <Box
         ref={live2dContainerRef}
-        // Apply styles conditionally based on mode
-        // Use the function to get dynamic responsive styles for window mode
         {...(mode === "window"
           ? getResponsiveLive2DWindowStyle(showSidebar)
           : live2dPetStyle)}
       >
-        <Live2D />
+        {/* Cambiado: <Live2D /> -> <MMDModel /> */}
+        <MMDModel pmxUrl="/models/suisei/suisei.pmx" />
       </Box>
 
       {/* Conditional Rendering of Window UI */}
       {mode === "window" && (
         <>
           {isElectron && <TitleBar />}
-          {/* Apply styles by spreading */}
           <Flex {...layoutStyles.appContainer}>
             <Box
               {...layoutStyles.sidebar}
@@ -158,7 +154,6 @@ function AppContent(): JSX.Element {
 function App(): JSX.Element {
   return (
     <ChakraProvider value={defaultSystem}>
-      {/* ModeProvider needs to wrap AppContent to provide mode to getGlobalStyles */}
       <ModeProvider>
         <AppWithGlobalStyles />
       </ModeProvider>
@@ -166,7 +161,6 @@ function App(): JSX.Element {
   );
 }
 
-// New component to access mode for global styles
 function AppWithGlobalStyles(): JSX.Element {
   return (
     <>
