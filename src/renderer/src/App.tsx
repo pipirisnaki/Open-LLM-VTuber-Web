@@ -103,12 +103,7 @@ function AppContent(): JSX.Element {
           <Live2D showSidebar={showSidebar} />
         </Box>
         {/* MMD encima */}
-        <MMDModel
-          pmxUrl="/models/suisei/suisei.pmx"
-          vmdUrl="/models/suisei/standing.vmd"
-          isPet={mode === 'pet'}
-          petOffsetY={1440}
-        />
+        <MMDModel pmxUrl="/models/suisei/suisei.pmx" isPet={mode === 'pet'} petOffsetY={1440} />
       </Box>
 
       {/* Conditional Rendering of Window UI */}

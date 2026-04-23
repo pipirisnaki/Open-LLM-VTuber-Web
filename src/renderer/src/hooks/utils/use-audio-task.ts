@@ -13,6 +13,7 @@ import { useWebSocket } from '@/context/websocket-context';
 import { DisplayText } from '@/services/websocket-service';
 import { useLive2DExpression } from '@/hooks/canvas/use-live2d-expression';
 import * as LAppDefine from '../../../WebSDK/src/lappdefine';
+import { useMMDAnimation, expressionToVmd } from '@/hooks/canvas/use-mmd-animation';
 
 // Simple type alias for Live2D model
 type Live2DModel = any;
@@ -37,6 +38,7 @@ export const useAudioTask = () => {
   const { appendResponse, appendAIMessage } = useChatHistory();
   const { sendMessage } = useWebSocket();
   const { setExpression } = useLive2DExpression();
+  const { setCurrentVmdUrl } = useMMDAnimation();
 
   // State refs to avoid stale closures
   const stateRef = useRef({
@@ -128,11 +130,11 @@ export const useAudioTask = () => {
         // Set expression if available
         const lappAdapter = (window as any).getLAppAdapter?.();
         if (lappAdapter && expressions?.[0] !== undefined) {
-          setExpression(
-            expressions[0],
-            lappAdapter,
-            `Set expression to: ${expressions[0]}`,
-          );
+          setExpression(expressions[0], lappAdapter, `Set expression to: ${expressions[0]}`)
+          const exprKey = String(expressions[0]).toLowerCase()
+          console.log('[MMDModel] Expression received:', expressions[0], 'key:', exprKey)
+          const vmdUrl = expressionToVmd[exprKey] || expressionToVmd['default']
+          setCurrentVmdUrl(vmdUrl)
         }
 
         // Start talk motion
@@ -148,7 +150,7 @@ export const useAudioTask = () => {
 
         // Setup audio element
         const audio = new Audio(audioDataUrl);
-        
+
         // Register with global audio manager IMMEDIATELY after creating audio
         audioManager.setCurrentAudio(audio, model);
         let isFinished = false;
