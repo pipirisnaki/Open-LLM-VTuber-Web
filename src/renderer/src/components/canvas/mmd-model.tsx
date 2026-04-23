@@ -27,8 +27,8 @@ export function MMDModel({ pmxUrl }: MMDModelProps) {
         const scene = new THREE.Scene()
 
         const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000)
-        camera.position.set(0, 10, 60)
-        camera.lookAt(0, 17, 0)
+        camera.position.set(0, 10.27, 40)
+        camera.lookAt(0, 10.27, 0)
 
         scene.add(new THREE.AmbientLight(0xffffff, 1.5))
         const dirLight = new THREE.DirectionalLight(0xffffff, 1)
